@@ -1,0 +1,15 @@
+.rake_test_cache
+*.pem
+*.key
+*.pub
+.chef
+*.gem
+*.yml
+tmp/*
+tmp*/*
+test/*
+*.old
+Gemfile.lock
+1
+htdocs/*
+*.sublime*

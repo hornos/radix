@@ -1,0 +1,99 @@
+#!/usr/bin/env ruby
+require 'gli'
+# begin # XXX: Remove this begin/rescue before distributing your app
+require 'radix'
+#rescue LoadError
+#  STDERR.puts "In development, you need to use `bundle exec bin/todo` to run your app"
+#  STDERR.puts "At install-time, RubyGems will make sure lib, etc. are in the load path"
+#  STDERR.puts "Feel free to remove this message from bin/radix now"
+#  exit 64
+#end
+
+include GLI::App
+
+program_desc 'Pusher based messaging'
+
+version Radix::VERSION
+
+# options
+# desc 'Debug'
+# 
+switch [:d,:debug]
+
+desc 'Configuration'
+default_value "#{File.basename(__FILE__)}.yml"
+arg_name 'config'
+flag [:c,:config]
+
+desc 'Agent id'
+arg_name 'id'
+flag [:i,:id]
+
+# commands
+desc 'Start radix server'
+arg_name ''
+
+command :server do |cmd|
+  cmd.action do |global_options,options,args|
+    server = Radix::Server.new(@config)
+    # server.bind(:data,:onData) do |data,chan,event|
+    #  server.onData(data,chan,event)
+    # end
+    server.run
+  end
+end
+
+desc 'Start radix client'
+arg_name ''
+command :client do |cmd|
+  cmd.action do |global_options,options,args|
+    client = Radix::Client.new(@config)
+    client.bind(:control,:onKey) do |data,chan,event|
+      client.onKey(data,chan,event)
+    end
+
+    # client.bind(:control,:onExit) do |data,chan,event|
+    #  client.onExit(data,chan,event)
+    # end
+
+    #client.bind(:control,:onCfg) do |data,chan,event|
+    #  client.onCfg(data,chan,event)
+    #  # pp client.cfg
+    #  puts client.cfg.to_yaml
+    #end
+    client.run
+  end
+end
+
+
+pre do |global,command,options,args|
+  # Pre logic here
+  # Return true to proceed; false to abourt and not call the
+  # chosen command
+  # Use skips_pre before a command to skip this block
+  # on that command only
+  # true
+
+  # read the configuration
+  @config = YAML.load( ERB.new( File.read( global[:config] ) ).result )
+  # default id
+  @config[:radix][:id] = global[:id] || command.name.to_s
+  # command line options
+  {:args=> args, :global=> global, :options=> options}.each { |k,v| @config[k] = v }
+end
+
+
+post do |global,command,options,args|
+  # Post logic here
+  # Use skips_post before a command to skip this
+  # block on that command only
+end
+
+on_error do |exception|
+  # Error logic here
+  # return false to skip default error handling
+  STDERR.puts exception.backtrace
+  true
+end
+
+exit run(ARGV)

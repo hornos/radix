@@ -1,0 +1,5 @@
+= radix
+
+Generate this with
+    radix rdoc
+After you have described your command line interface
