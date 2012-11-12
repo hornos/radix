@@ -1,0 +1,14 @@
+#!/usr/bin/env ruby
+require 'radix'
+
+module Ripl::Radix
+  VERSION = '0.0.1'
+  module Commands
+    extend self
+    def start
+    end
+  end
+end
+Ripl::Shell.include Ripl::Radix
+Ripl::Commands.include Ripl::Radix::Commands
+Ripl.start

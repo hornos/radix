@@ -1,4 +1,4 @@
-
+module Radix
   module Redux
     def msgpack(data,enc=:encode)
       return data.to_msgpack          if enc == :encode
@@ -25,4 +25,4 @@
       return Ascii85.decode(data) if enc == :decode
     end
   end
-
+end

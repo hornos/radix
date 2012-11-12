@@ -19,7 +19,9 @@ module Radix
       @config = config
 
       # init the log
-      @log = Logger.new(STDOUT)
+      log = open(@config[:radix][:log], File::WRONLY | File::APPEND | File::CREAT) || STDOUT
+      log.sync = true
+      @log = Logger.new(log)
       @log.level = @config[:global][:debug] ? Logger::DEBUG : Logger::INFO
       @log.formatter = proc do |severity, datetime, progname, msg|
         "#{severity} #{datetime}: #{msg}\n"
@@ -39,6 +41,11 @@ module Radix
       @log.info("[#{@config[:radix][:id]}/#{__method__}] #{chan}/#{event}")
       chan,event = enmap(chan,event)
       socket[chan].bind(event) do |data|
+        if not @config[:radix][:id] =~ data[:to]
+          @log.info("[#{@config[:radix][:id]}/#{__method__}] not for me")
+          return     
+        end
+        data = data[:data]
         yield(data,chan,event)
       end if block_given?
     end

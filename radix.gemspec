@@ -31,5 +31,6 @@ lib/radix.rb
   s.add_development_dependency('Ascii85')
   s.add_development_dependency('ohai')
   s.add_development_dependency('eventmachine')
+  # s.add_development_dependency('ripl')
   s.add_runtime_dependency('gli','2.4.1')
 end

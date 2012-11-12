@@ -14,25 +14,36 @@ module Radix
       Pusher.app_id = cfg[:app_id]
       Pusher.key    = cfg[:key]
       Pusher.secret = cfg[:secret]
-      Pusher.encrypted = config[:encrypted]     
-      PusherClient.logger = Logger.new(STDOUT)
+      Pusher.encrypted = config[:encrypted]
+
+      log = open(@config[:radix][:log], File::WRONLY | File::APPEND | File::CREAT) || STDOUT
+      log.sync = true    
+      PusherClient.logger = Logger.new(log)
       PusherClient.logger.level = @config[:global][:debug] ? Logger::DEBUG : Logger::INFO
 
       options = {:secret => cfg[:secret]}
       key = cfg[:key]
-      @socket = PusherClient::Socket.new(key, options)     
+      begin
+        @socket = PusherClient::Socket.new(key, options)
+      rescue Exception => ex
+        @log.debug("[#{id}/#{__method__}] #{ex.inspect}")
+        puts ex.backtrace
+      end 
     end
 
     # trigger event
-    def trigger(data,chan,event,callb=nil)
+    def trigger(data=nil,to=/.*/,chan=:data,event=:onData)
+      raise 'empty trigger' if data.nil?
       _chan,_event = enmap(chan,event)
       raise 'map error' if _chan.nil? or _event.nil?
       cfg = @config[:radix][:pusher]
+      id = @config[:radix][:id]
       count,time = 3, 5
 
-      id = @config[:radix][:id]
-      data = [id] << data
-      data << callb if not callb.nil?
+      data = { :pl => data,
+               :id => id,
+               :to => to }
+      puts data.inspect
 
       begin
         Pusher[_chan].trigger(_event, enchan(data,_chan,_event) )
@@ -44,10 +55,6 @@ module Radix
         puts ex.backtrace
         retry if count > 0
        end
-    end
-
-    def trigger!(data,chan,event)
-      trigger(data,chan,event,:data)
     end
 
     # threads

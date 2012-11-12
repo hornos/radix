@@ -25,6 +25,10 @@ default_value "#{File.basename(__FILE__)}.yml"
 arg_name 'config'
 flag [:c,:config]
 
+desc 'Log file'
+arg_name 'log'
+flag [:l,:log]
+
 desc 'Agent id'
 arg_name 'id'
 flag [:i,:id]
@@ -33,15 +37,27 @@ flag [:i,:id]
 desc 'Start radix server'
 arg_name ''
 
+
 command :server do |cmd|
   cmd.action do |global_options,options,args|
+
     server = Radix::Server.new(@config)
     # server.bind(:data,:onData) do |data,chan,event|
     #  server.onData(data,chan,event)
     # end
-    server.run
+    server_thread = Thread.new { server.run }
+    # *-------------------------------------------------------------------
+    # Land you at the heart of intrusion
+    # -------------------------------------------------------------------*
+    if @config[:radix][:pry]
+      binding.pry
+    else
+      server_thread.join
+    end
   end
 end
+
+
 
 desc 'Start radix client'
 arg_name ''
@@ -77,7 +93,8 @@ pre do |global,command,options,args|
   # read the configuration
   @config = YAML.load( ERB.new( File.read( global[:config] ) ).result )
   # default id
-  @config[:radix][:id] = global[:id] || command.name.to_s
+  @config[:radix][:id]  = global[:id]  || command.name.to_s
+  @config[:radix][:log] = global[:log] || command.name.to_s + ".log"
   # command line options
   {:args=> args, :global=> global, :options=> options}.each { |k,v| @config[k] = v }
 end

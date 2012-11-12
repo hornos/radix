@@ -27,6 +27,7 @@ class Hash
 
 end
 
+# TODO: trigger mod
 module Radix
   module Event
 
