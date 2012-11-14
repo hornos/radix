@@ -53,7 +53,7 @@ module Radix
       @cipher.update(data) + @cipher.final
     end
 
-    # dictionary mapper
+    # string obfuscator
     # human to guff readable
     def enmap(*data)
       data.map { |d| @config[:radix][:maps][d] }
@@ -64,7 +64,7 @@ module Radix
       data.map { |d| @config[:radix][:maps].rassoc(d)[0] }
     end
 
-    # data coder
+    # data encoder
     def encode(redux,data)
       log = "data(#{data.to_s.size})"
       redux.inject(data) do |enc,encoder|
@@ -85,17 +85,17 @@ module Radix
       data
     end
 
-    # channel coder
+    # channel encoder
     def enchan(data,_chan,_event)
-      chan,event = demap(_chan,_event)
+      chan, event = demap( _chan, _event )
       @log.debug("[#{@config[:radix][:id]}/#{__method__}] event: #{chan}/#{event}")
       encode(@config[:radix][:channels][chan.to_sym][:redux], data)
     end
 
     def dechan(data,_chan,_event)
-      chan,event  = demap(_chan,_event)
+      chan, event  = demap( _chan, _event )
       @log.debug("[#{@config[:radix][:id]}/#{__method__}] event: #{chan}/#{event}")
-      decode(@config[:radix][:channels][chan.to_sym][:redux],data)
+      decode(@config[:radix][:channels][chan.to_sym][:redux], data)
     end
 
     # generate new aes key

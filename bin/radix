@@ -40,11 +40,7 @@ arg_name ''
 
 command :server do |cmd|
   cmd.action do |global_options,options,args|
-
     server = Radix::Server.new(@config)
-    # server.bind(:data,:onData) do |data,chan,event|
-    #  server.onData(data,chan,event)
-    # end
     server_thread = Thread.new { server.run }
     # *-------------------------------------------------------------------
     # Land you at the heart of intrusion
@@ -64,8 +60,9 @@ arg_name ''
 command :client do |cmd|
   cmd.action do |global_options,options,args|
     client = Radix::Client.new(@config)
-    client.bind(:control,:onKey) do |data,chan,event|
-      client.onKey(data,chan,event)
+    # bind to control channel onKey event
+    client.bind( :control, :onKey ) do |data,chan,event|
+      client.onKey( data, chan, event )
     end
 
     # client.bind(:control,:onExit) do |data,chan,event|
@@ -94,7 +91,8 @@ pre do |global,command,options,args|
   @config = YAML.load( ERB.new( File.read( global[:config] ) ).result )
   # default id
   @config[:radix][:id]  = global[:id]  || command.name.to_s
-  @config[:radix][:log] = global[:log] || command.name.to_s + ".log"
+  # @config[:radix][:log] = global[:log] || command.name.to_s + ".log"
+  @config[:radix][:log] = global[:log] if not global[:log].nil?
   # command line options
   {:args=> args, :global=> global, :options=> options}.each { |k,v| @config[k] = v }
 end

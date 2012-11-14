@@ -1,3 +1,6 @@
+
+# monkeypatch
+# TODO: use active support as a package
 class Hash
   # http://grosser.it/2009/04/14/recursive-symbolize_keys/
   def recursive_symbolize_keys!
@@ -27,27 +30,33 @@ class Hash
 
 end
 
-# TODO: trigger mod
+
 module Radix
   module Event
 
-    # key xc
-    def trKey(target=:data,chan=:control,event=:onKey)
-      @log.info("[#{@config[:radix][:id]}/#{__method__}] #{chan.to_s}/#{event.to_s} for #{target.to_s} channel")
-      trigger(keygen!(target),chan,event)
+    # trigger key exchange
+    def trKey( target = :data, dest = /.*/, chan = :control, event = :onKey )
+      @log.info("[#{@config[:radix][:id]}/#{__method__}] #{chan.to_s}/#{event.to_s} #{target.to_s} #{dest}")
+      # update server key as well
+      trigger( keygen!( target ), dest, chan, event )
     end
 
-    def onKey(data,_chan,_event)
-      source,config,target = dechan(data,_chan,_event)
-      id = @config[:radix][:id]
-      me = "#{id}/#{__method__}"
-      return if id == source
+    def onKey( payload, _chan, _event )
+      # trigger channel event by PusherAgent#trigger enchan payload
+      source, dest, data = dechan( payload, _chan, _event )
+      dest = /#{dest}/
 
-      @log.info("[#{me}] from #{source}")
-      stop(:control) # by friendly fire
-      config!(config) # for the channel
-      # start target
-      start(target.to_sym) if not target.nil? 
+      id, method = @config[:radix][:id], "#{id}/#{__method__}"
+      @log.debug( "#{id}/#{__method__}: #{source} #{dest} #{data}" )
+
+      # prevent self-keying or false destination     
+      return if id == source or not id =~ dest
+
+      @log.info("[#{method}] new key from #{source}")
+      # stop control thread by the new leader
+      stop( :control )
+      # set the new keys
+      config!( data ) 
     end
 
     # data xc
@@ -56,6 +65,7 @@ module Radix
       trigger(data,chan,event)
     end
 
+    # TODO: prevent message loss by retry the old key?
     def onData(data,_chan,_event)
       id = @config[:radix][:id]
       me = "#{id}/#{__method__}"      
@@ -66,6 +76,7 @@ module Radix
       rescue Exception => ex
         @log.debug("[#{me}] data error: #{ex.inspect}")        
       end
+      # TODO: send to the local queue and to dashing
     end
 
     def trCfg(data,chan=:data,event=:onCfg)
@@ -86,7 +97,6 @@ module Radix
           @log.debug("[#{me}] #{d.to_s}")
         end
       end
-      # start(:data) # threads/data/thread
     end
 
     # exit

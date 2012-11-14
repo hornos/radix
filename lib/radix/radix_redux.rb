@@ -1,3 +1,7 @@
+# reductio ad absurdum
+# try to pack json as much as possible
+# check push message limits for each relay
+
 module Radix
   module Redux
     def msgpack(data,enc=:encode)

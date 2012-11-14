@@ -17,42 +17,50 @@ module Radix
     def initialize(config,inbound=:client,outbound=:server)
       raise 'nil config' if config.nil?
       @config = config
+      cfg = @config[:radix]
 
       # init the log
-      log = open(@config[:radix][:log], File::WRONLY | File::APPEND | File::CREAT) || STDOUT
-      log.sync = true
+      # TODO: sentry integration
+      begin
+        log = open(cfg[:log], File::WRONLY | File::APPEND | File::CREAT) if not cfg[:log].nil?
+        log.sync = true
+      rescue
+        log = STDOUT
+      end
       @log = Logger.new(log)
       @log.level = @config[:global][:debug] ? Logger::DEBUG : Logger::INFO
       @log.formatter = proc do |severity, datetime, progname, msg|
         "#{severity} #{datetime}: #{msg}\n"
       end
  
-      # init rsa
-      init_rsa_cipher(inbound, outbound)
+      # init rsa for aes keys
+      init_rsa_cipher( inbound, outbound )
 
-      # init aes
+      # init aes for data
       init_aes_cipher
 
       # init pusher
-      init_pusher
+      init_pusher if not cfg[:relay][:pusher].nil?
+
+      # init amqp
+      # init_amqp if not cfg[:relay][:amqp].nil?
     end
 
-    def bind(chan,event)
+    # bind block to a channel event
+    def bind( chan, event )
       @log.info("[#{@config[:radix][:id]}/#{__method__}] #{chan}/#{event}")
-      chan,event = enmap(chan,event)
+      chan, event = enmap( chan, event )
+
       socket[chan].bind(event) do |data|
-        if not @config[:radix][:id] =~ data[:to]
-          @log.info("[#{@config[:radix][:id]}/#{__method__}] not for me")
-          return     
-        end
-        data = data[:data]
         yield(data,chan,event)
       end if block_given?
+
     end
 
   end # Agent
 
 
+  # top level classes
   class Client < Agent
     def initialize(config)
       super(config,:client,:server)
@@ -70,9 +78,9 @@ module Radix
     end
 
     def run
-      # key watch
+      # client thread listens server heratbeat change
       client_thread
-      # key heartbeat
+      # heartbeat by key
       control_thread
       connect
     end

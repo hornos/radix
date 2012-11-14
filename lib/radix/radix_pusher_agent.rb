@@ -1,4 +1,5 @@
 
+# EM monkeypatch
 module EventMachine
   def EventMachine.schedule_periodic_timer(proc,delay=120)
     schedule(proc)
@@ -10,55 +11,59 @@ end
 module Radix
   module PusherAgent
     def init_pusher
-      cfg = @config[:radix][:pusher]
-      Pusher.app_id = cfg[:app_id]
-      Pusher.key    = cfg[:key]
-      Pusher.secret = cfg[:secret]
-      Pusher.encrypted = config[:encrypted]
+      cfg = @config[:radix][:relay][:pusher]
+      # TODO: do call
+      Pusher.app_id    = cfg[:app_id]
+      Pusher.key       = cfg[:key]
+      Pusher.secret    = cfg[:secret]
+      Pusher.encrypted = cfg[:encrypted]
 
-      log = open(@config[:radix][:log], File::WRONLY | File::APPEND | File::CREAT) || STDOUT
-      log.sync = true    
+      # open log file or fallback to stdout
+      # TODO: duplication with Agent
+      begin
+        log = open( @config[:radix][:log], File::WRONLY | File::APPEND | File::CREAT )
+        log.sync = true
+      rescue
+        log = STDOUT
+      end  
+
       PusherClient.logger = Logger.new(log)
       PusherClient.logger.level = @config[:global][:debug] ? Logger::DEBUG : Logger::INFO
 
-      options = {:secret => cfg[:secret]}
-      key = cfg[:key]
+      # connect to pusher
       begin
-        @socket = PusherClient::Socket.new(key, options)
+        @socket = PusherClient::Socket.new( cfg[:key], { :secret => cfg[:secret] } )
       rescue Exception => ex
         @log.debug("[#{id}/#{__method__}] #{ex.inspect}")
         puts ex.backtrace
       end 
     end
 
-    # trigger event
-    def trigger(data=nil,to=/.*/,chan=:data,event=:onData)
-      raise 'empty trigger' if data.nil?
-      _chan,_event = enmap(chan,event)
-      raise 'map error' if _chan.nil? or _event.nil?
-      cfg = @config[:radix][:pusher]
-      id = @config[:radix][:id]
-      count,time = 3, 5
-
-      data = { :pl => data,
-               :id => id,
-               :to => to }
-      puts data.inspect
-
-      begin
-        Pusher[_chan].trigger(_event, enchan(data,_chan,_event) )
-      rescue Exception => ex
-        sleep time
-        count -= 1
-        @log.debug("[#{id}/#{__method__}] #{ex.inspect}")
-        @log.warn("[#{id}/#{__method__}] retry: #{count}")
-        puts ex.backtrace
-        retry if count > 0
-       end
+    def init_amqp
+      return
     end
 
-    # threads
-    def stop(thread=:control)
+    # event triggers
+    def trigger( data = nil, dest = /.*/, chan = :data, event = :onData )
+      raise 'empty trigger' if data.nil?
+      
+      cfg = @config[:radix]
+      # obfuscate channel and event
+      _chan, _event = enmap( chan, event )
+      raise 'map error' if _chan.nil? or _event.nil?
+
+      # construct payload
+      payload = [cfg[:id], dest.to_s, data]
+
+      # begin pushing the event
+      # catch it by onEvent dechan -> source, dest, data
+      Pusher[_chan].trigger(_event, enchan( payload, _chan, _event ) ) if not cfg[:relay][:pusher].nil?
+
+      # amqp
+    end
+
+    # stop a thread
+    def stop( thread = :control )
       cfg = @config[:radix][:threads]
       return if cfg[thread][:thread].nil?
       return if cfg[thread][:thread].status == false
@@ -66,17 +71,17 @@ module Radix
       cfg[:control][:thread].exit
     end
 
-    def start(thread=:data)
+    # start a thread
+    def start( thread = :data )
       cfg = @config[:radix][:threads]
-
       return if cfg[thread][:thread].nil?
-
       if cfg[thread][:thread].status == 'sleep'
         @log.info("[#{@config[:radix][:id]}/#{__method__}] resume data thread")
         cfg[thread][:thread].run
       end
     end
 
+    # self reconfig
     def config!(data)
       data.each do |chan,opts|
         @config[:radix][:channels][chan.to_sym] = Hash[opts.map{ |k, v| [k.to_sym, v] }]
@@ -84,7 +89,7 @@ module Radix
       end
     end
 
-    # pusher
+    # pusher api
     def subscribe(chan)
       @socket.subscribe(enmap(chan))
     end
@@ -93,7 +98,7 @@ module Radix
       @socket.connect
     end
 
-    # triggers aes key change
+    # triggers aes key change for data channel
     def control_thread
       @config[:radix][:threads][:control][:thread] = Thread.new do
         delay = @config[:radix][:threads][:control][:delay]
@@ -105,7 +110,7 @@ module Radix
       end
     end
 
-    # server key change
+    # aes key change listener
     def client_thread
       Thread.new do
         client = Client.new(@config)
@@ -116,20 +121,20 @@ module Radix
       end
     end
 
-    # client config
+    # remote config clients
     def config_thread
       @config[:radix][:threads][:control][:thread] = Thread.new do
         delay = @cfg[:pushare][:threads][:control][:delay]
         prCfg = Proc.new do
           data = {:radix=>{:maps=>@config[:pushare][:maps].dup,
-                             :channels=>{:data=>@config[:radix][:channels][:data].dup}}}
+                           :channels=>{:data=>@config[:radix][:channels][:data].dup}}}
           trCfg(data)
         end
         EventMachine::run { EventMachine::schedule_periodic_timer(prCfg,delay) }
       end
     end
 
-    # data
+    # send data
     def data_thread
       @config[:radix][:threads][:data] ||= {}
       @config[:radix][:threads][:data][:thread] = Thread.new do
