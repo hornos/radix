@@ -40,7 +40,7 @@ module Radix
     end
 
     def init_amqp
-      return
+      @mq = AMQP::Channel.new( AMQP.connect(:host => '127.0.0.1') )
     end
 
     # event triggers
@@ -60,6 +60,9 @@ module Radix
       Pusher[_chan].trigger(_event, enchan( payload, _chan, _event ) ) if not cfg[:relay][:pusher].nil?
 
       # amqp
+      if cfg[:relay][:amqp]
+        @mq.direct("").publish payload, :routing_key => "radix.#{chan.to_s}.#{event.to_s}"
+      end
     end
 
     # stop a thread
@@ -95,7 +98,7 @@ module Radix
     end
 
     def connect
-      @socket.connect
+      @socket.connect if not @config[:radix][:relay][:pusher].nil?
     end
 
     # triggers aes key change for data channel

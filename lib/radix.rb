@@ -17,6 +17,7 @@ require 'digest/sha2'
 require 'open3'
 require 'ohai'
 require 'eventmachine'
+require 'amqp'
 #require 'ripl'
 
 require 'radix/radix_event.rb'

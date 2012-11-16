@@ -46,7 +46,8 @@ module Radix
       source, dest, data = dechan( payload, _chan, _event )
       dest = /#{dest}/
 
-      id, method = @config[:radix][:id], "#{id}/#{__method__}"
+      id = @config[:radix][:id]
+      method = "#{id}/#{__method__}"
       @log.debug( "#{id}/#{__method__}: #{source} #{dest} #{data}" )
 
       # prevent self-keying or false destination     
@@ -56,7 +57,8 @@ module Radix
       # stop control thread by the new leader
       stop( :control )
       # set the new keys
-      config!( data ) 
+      config!( data )
+      puts @config.inspect if @config[:global][:debug]
     end
 
     # data xc

@@ -42,8 +42,6 @@ module Radix
       # init pusher
       init_pusher if not cfg[:relay][:pusher].nil?
 
-      # init amqp
-      # init_amqp if not cfg[:relay][:amqp].nil?
     end
 
     # bind block to a channel event
@@ -78,6 +76,8 @@ module Radix
     end
 
     def run
+            # init amqp
+      init_amqp if not @config[:radix][:relay][:amqp].nil?
       # client thread listens server heratbeat change
       client_thread
       # heartbeat by key
